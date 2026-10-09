@@ -4,7 +4,7 @@ A browser escape room that reviews the foundations of artificial intelligence. T
 
 The whole game is one HTML file. There is nothing to install and nothing to build.
 
-**Play it:** `https://YOUR-USERNAME.github.io/YOUR-REPO-NAME/`
+**Play it:** `https://cynthialmcginnis.github.io/Operation_Ground_Truth_Escape_Room/`
 
 ## The scenario
 
