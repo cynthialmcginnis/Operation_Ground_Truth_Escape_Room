@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Operation Ground Truth</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a full-screen first-person corridor. A thin status rail on top, one action prompt at the bottom, and a terminal panel that opens over the scene. Single dark look by choice: a facility in lockdown. */
+:root{
+  color-scheme:dark;
+  --void:#0a121c; --steel:#142130; --steel-2:#1d2f43; --line:#37526d;
+  --ink:#e1ebf4; --dim:#93a9bd;
+  --amber:#ffb23e; --lock:#ff6152; --clear:#62e6b4;
+  --display:"Chakra Petch","Trebuchet MS",Verdana,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(120% 90% at 50% 40%,var(--steel-2),var(--void) 70%);color:var(--ink);font:400 16px/1.55 var(--body);overflow:hidden}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+.rail{position:fixed;left:0;right:0;top:0;z-index:3;display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;background:linear-gradient(rgba(10,18,28,.92),rgba(10,18,28,0))}
+.brand{font:700 15px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.pips{display:flex;gap:6px;margin-right:auto}
+.pip{width:22px;height:28px;border:2px solid var(--lock);display:grid;place-items:center;font:500 12px/1 var(--mono);color:var(--lock)}
+.pip.now{border-color:var(--amber);color:var(--amber);background:rgba(255,178,62,.14)}
+.pip.ok{border-color:var(--clear);background:var(--clear);color:var(--void)}
+.clock{font:500 22px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.clock.low{color:var(--amber)} .clock.over{color:var(--lock)}
+.ghost{background:none;border:1px solid var(--line);padding:6px 10px;font-size:13px;color:var(--dim);cursor:pointer}
+.ghost:hover{color:var(--ink);border-color:var(--dim)}
+.confirm{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--dim)}
+
+.prompt{position:fixed;left:0;right:0;bottom:0;z-index:3;display:flex;justify-content:center;
+  padding:24px 16px calc(18px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(10,18,28,0),rgba(10,18,28,.94))}
+.prompt-in{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;justify-content:center;text-align:center}
+.prompt p{margin:0;font:600 17px/1.3 var(--display);letter-spacing:.03em}
+
+.go{background:var(--amber);color:#1a1204;border:0;padding:12px 22px;font:700 15px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.go:hover{filter:brightness(1.1)}
+.go.green{background:var(--clear);color:#04130d}
+
+.overlay{position:fixed;inset:0;z-index:4;overflow-y:auto;background:rgba(8,14,22,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(20px + env(safe-area-inset-bottom,0px));padding-inline:16px;display:grid}
+.panel{margin:auto;width:100%;max-width:780px;background:var(--steel);border:1px solid var(--line);border-top:3px solid var(--amber);
+  padding:clamp(18px,4vw,34px);display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel.ok{border-top-color:var(--clear)}
+.panel.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-7px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+@media (prefers-reduced-motion:reduce){.panel.shake{animation:none}}
+.eyebrow{font:500 12px/1.3 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0}
+.ok .eyebrow{color:var(--clear)}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h1{font-size:clamp(30px,6vw,46px);line-height:1.05;font-weight:700;letter-spacing:.01em}
+h2{font-size:clamp(24px,4.4vw,32px);line-height:1.1;font-weight:700}
+h3{font-size:17px;font-weight:600;letter-spacing:.03em}
+p{margin:0;max-width:66ch}
+.head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.head>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dim{color:var(--dim)}
+.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px;max-width:66ch}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.field input{background:var(--void);border:1px solid var(--line);padding:12px;font-size:17px;width:100%;max-width:360px}
+.row{display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap}
+
+.ref{display:flex;flex-wrap:wrap;gap:6px 8px;padding:12px;background:var(--void);border:1px solid var(--line)}
+.ref span{font:400 13px/1.3 var(--mono);color:var(--dim)} .ref b{color:var(--amber);font-weight:500}
+.ref .cap{flex-basis:100%;text-transform:uppercase;letter-spacing:.12em;font-size:11px}
+.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.items>li{display:flex;flex-direction:column;gap:10px;padding:14px;background:var(--steel-2);border-left:3px solid var(--line);min-width:0}
+.items>li.set{border-left-color:var(--amber)}
+.items>li.grp{background:none;border:0;padding:10px 0 0}
+.items>li.grp h3{font:500 13px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.card{background:var(--void);border:1px solid var(--line);padding:10px;font-size:14.5px;line-height:1.45}
+.card b{display:block;font:500 11px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:4px}
+.card.q{border-color:var(--amber)}
+blockquote{margin:0;padding:10px 14px;border-left:2px solid var(--amber);background:var(--void);font-style:italic;max-width:66ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips.long{flex-direction:column}
+.chip{background:var(--void);border:1px solid var(--line);padding:8px 11px;font-size:14.5px;line-height:1.3;cursor:pointer;text-align:left;color:var(--ink)}
+.chip b{font:500 14px/1 var(--mono);color:var(--amber);margin-right:6px}
+.chip:hover{border-color:var(--amber)}
+.chip[aria-checked="true"]{background:var(--amber);border-color:var(--amber);color:#1a1204;font-weight:600}
+.chip[aria-checked="true"] b{color:#1a1204}
+.codebar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;padding-top:4px}
+.code{font:500 clamp(22px,5vw,30px)/1 var(--mono);letter-spacing:.14em;padding:12px 14px;background:var(--void);border:1px solid var(--line);color:var(--amber);overflow-wrap:anywhere}
+.ok .code{color:var(--clear);border-color:var(--clear)}
+.fb{min-height:1.5em;font-weight:600}
+.fb.bad{color:var(--lock)} .fb.tip{color:var(--amber);font-weight:400}
+.why{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:66ch}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0}
+.stats div{background:var(--void);border:1px solid var(--line);padding:12px}
+.stats dt{font:500 11px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.stats dd{margin:6px 0 0;font:500 22px/1.1 var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.cert{display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center;border:2px solid var(--clear);outline:1px solid var(--line);outline-offset:5px;padding:clamp(16px,4vw,34px);margin:6px;min-width:0}
+.cert p{max-width:none}
+.cert-line{color:var(--dim)}
+.cert-team{font:700 clamp(28px,6vw,44px)/1.1 var(--display);color:var(--clear);overflow-wrap:anywhere}
+.cert-members{font-size:18px;font-weight:500;overflow-wrap:anywhere}
+.cert .stats{width:100%;text-align:left}
+.stats .wide{grid-column:1/-1}
+.stats dd.sm{font-size:16px;line-height:1.35}
+.cert .code{font-size:clamp(14px,2.6vw,19px);letter-spacing:.06em;margin:0}
+.cert-id{font:400 13px/1.4 var(--mono);color:var(--dim)}
+@media print{
+  :root{--void:#fff;--steel:#fff;--steel-2:#fff;--line:#666;--ink:#111;--dim:#333;--amber:#111;--clear:#0b5e41;color-scheme:light}
+  html,body{height:auto}
+  body{overflow:visible;background:#fff}
+  #scene,.rail,.prompt,.noprint{display:none!important}
+  .overlay{position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;display:block;overflow:visible}
+  .panel{border:0;max-width:none;padding:0}
+}
+@media (max-width:520px){.brand{display:none}.clock{font-size:19px}.prompt p{font-size:15px}}
+</style>
+
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<header class="rail">
+  <span class="brand">Operation Ground Truth</span>
+  <div class="pips" id="pips" aria-label="Door progress"></div>
+  <span class="clock" id="clock" aria-label="Time remaining">50:00</span>
+  <button class="ghost" id="snd" type="button">Sound: on</button>
+  <span id="rs"><button class="ghost" id="restart" type="button">Restart</button></span>
+</header>
+
+<div class="prompt" id="prompt" hidden>
+  <div class="prompt-in"><p id="ptext"></p><button class="go" id="pbtn" type="button">Open the terminal</button></div>
+</div>
+
+<div class="overlay" id="overlay"><section class="panel" id="panel" aria-live="polite"></section></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+var CANPRINT=true, LIMIT=3000, PEN=60, KEY='ogt-state-v3';
+var HASH=[["1438jvk","1438kpl","1438lk6","1438me3","1438n8o","1438o2t"],["143xyxi","143xzru","143y0mc","143y1fu","143y2a2","143y34d","143y3zj","143y4te"],["144ndzb","144netm","144nfnw","144ngi3","144nhdc","144ni7d","144nj1b","144njw1","144nkpx"],["145ct1n","145ctvu","145cuq4","145cvkg","145cwek","145cx8x","145cy3k","145cyxr"],["146284m","14628yo","14629t4","1462and","1462bhs","1462cbn","1462d5w"],["146rn6t","146ro1c","146rov6","146rpp9","146rqjz","146rre4","146rs81"]];
+var EXPL=JSON.parse(atob('W1siU3BlZWQgcmVwb3J0cyBhbmQgbWFya2VkIGVtYWlscyBhcmUgd2hhdCB0aGUgc3lzdGVtIGxlYXJuZWQgZnJvbSAoTCkuIiwiVGhlIHdlZWtkYXkgcm9hZCBhbmQgdGhlIHNvbmdzIHRoYXQgZ28gdG9nZXRoZXIgYXJlIHBhdHRlcm5zIHRoZSBzeXN0ZW0gcmVjb2duaXplZCAoUCkuIiwiUGlja2luZyB0aGUgZmFzdGVzdCByb3V0ZSBhbmQgYmxvY2tpbmcgdGhlIHB1cmNoYXNlIGFyZSBkZWNpc2lvbnMgKEQpLiIsIkFzayB0aGVzZSB0aHJlZSBxdWVzdGlvbnMgYWJvdXQgZXZlcnkgc3lzdGVtIHlvdSBtZWV0LiJdLFsiSGFuZC13cml0dGVuIHJ1bGVzIG1ha2UgdGhlIHRheCBwcm9ncmFtIEFJLCBidXQgbm90IG1hY2hpbmUgbGVhcm5pbmcgKEEpLiBNYW55IGxheWVycyBtYWtlIGZhY2UgdW5sb2NrIGRlZXAgbGVhcm5pbmcgKEQpLiBUaGUgbXVzaWMgYXBwIGxlYXJucyBmcm9tIGRhdGEsIHNvIGl0IGlzIG1hY2hpbmUgbGVhcm5pbmcgKE0pLiIsIlRoZSBtYXJrZWQgZW1haWxzIGFyZSB0aGUgdHJhaW5pbmcgZGF0YSAoMikuIFRoZSBzdGVwcyB0aGF0IGZpbmQgdGhlIHBhdHRlcm5zIGFyZSB0aGUgYWxnb3JpdGhtICgxKS4gVGhlIGxlYXJuZWQgcGF0dGVybiB0aGF0IHNjb3JlcyBuZXcgZW1haWwgaXMgdGhlIG1vZGVsICgzKS4iLCJFdmVyeSBkZWVwIGxlYXJuaW5nIHN5c3RlbSBpcyBtYWNoaW5lIGxlYXJuaW5nLCBhbmQgZXZlcnkgbWFjaGluZSBsZWFybmluZyBzeXN0ZW0gaXMgQUkuIFRoYXQgY2xhaW0gaXMgdHJ1ZS4iLCJBIHN5c3RlbSB0aGF0IGZvbGxvd3MgaGFuZC13cml0dGVuIHJ1bGVzIGlzIHN0aWxsIEFJLiBJdCBpcyBub3QgbWFjaGluZSBsZWFybmluZy4gVGhhdCBjbGFpbSBpcyBmYWxzZS4iXSxbIkEgcGVyc29uIHdyb3RlIHRoZSBtZW5pbmdpdGlzIHJ1bGUsIHNvIGl0IGlzIHN5bWJvbGljICgxKS4gR3JvdXBzIG5vYm9keSBkZWZpbmVkIHBvaW50IHRvIHVuc3VwZXJ2aXNlZCBsZWFybmluZyAoMykuIFJld2FyZHMgYW5kIHBlbmFsdGllcyBwb2ludCB0byByZWluZm9yY2VtZW50IGxlYXJuaW5nICg0KS4gTGFiZWxlZCBwYXN0IGxvYW5zIHBvaW50IHRvIHN1cGVydmlzZWQgbGVhcm5pbmcgKDIpLiIsIkluc3BlY3Rpb24gcGhvdG9zIGFyZSBjb21wdXRlciB2aXNpb24gKFYpLiBSZWFkaW5nIHRoZSB0b25lIG9mIHJldmlld3MgaXMgbmF0dXJhbCBsYW5ndWFnZSBwcm9jZXNzaW5nIChOKS4gU3VnZ2VzdGluZyBmcm9tIHBhc3QgY2hvaWNlcyBpcyBhIHJlY29tbWVuZGF0aW9uIHN5c3RlbSAoQykuIiwiQSBjaGFpbiBvZiB5ZXMtb3Itbm8gcXVlc3Rpb25zIGlzIGEgZGVjaXNpb24gdHJlZSAoVCkuIEtlZXBpbmcgYW5kIGNvbWJpbmluZyB0aGUgYmVzdCBzb2x1dGlvbnMgaXMgYSBnZW5ldGljIGFsZ29yaXRobSAoRykuIiwiUmVhbCBzeXN0ZW1zIG9mdGVuIG1peCB0aGVzZSBhcHByb2FjaGVzLiJdLFsiVHVyaW5nIHByb3Bvc2VkIGhpcyB0ZXN0IGluIDE5NTAuIFRoZSBEYXJ0bW91dGggcHJvcG9zYWwgbmFtZWQgdGhlIGZpZWxkIGluIDE5NTUgdG8gMTk1Ni4gRGVlcCBCbHVlIHdvbiBpbiAxOTk3LiIsIkFsZXhOZXQgd29uIGluIDIwMTIuIEFscGhhR28gd29uIGluIDIwMTYuIFRoZSB0cmFuc2Zvcm1lciBkZXNpZ24gY2FtZSBpbiAyMDE3LiIsIkV4cGVydCBzeXN0ZW1zIGNvc3QgdG9vIG11Y2ggdG8gbWFpbnRhaW4sIHdlcmUgaGFyZCB0byB1cGRhdGUsIGFuZCBjb3VsZCBub3QgbGVhcm4gKEMpLiBIYW5kLXdyaXR0ZW4gcnVsZXMgaGl0IGEgY2VpbGluZy4iLCJFYXJseSBBSSB3cm90ZSBpbnRlbGxpZ2VuY2UgZG93biBhcyBydWxlcy4gTW9kZXJuIEFJIGxlYXJucyBmcm9tIGRhdGEgKEEpLiBUaGF0IHNoaWZ0IHdvcmtlZCBvbmNlIGNvbXB1dGVycyBnb3QgZmFzdCBlbm91Z2ggYW5kIGRhdGEgZ290IGJpZyBlbm91Z2guIl0sWyJUaGUgWC1yYXkgcmVhZGVyIGFuZCB0aGUgZnJhdWQgZmxhZ2dlciBhcmUgbmFycm93LiBFYWNoIGRvZXMgb25lIGpvYiBhbmQgc3RvcHMgYXQgaXRzIGJvdW5kYXJ5LiIsIkEgc3lzdGVtIHRoYXQgY291bGQgdGFrZSBvbiBhbnkgaW50ZWxsZWN0dWFsIHRhc2sgYSBwZXJzb24gY2FuIGlzIGdlbmVyYWwgQUkuIE5vIHN1Y2ggc3lzdGVtIGV4aXN0cy4iLCJUaGUgY2hhdGJvdCBpcyBzdGlsbCBuYXJyb3cuIEl0IGNvdmVycyBtYW55IHRhc2tzLCBidXQgaXQgaW52ZW50cyBzb3VyY2VzIGFuZCBjYW5ub3QgY2hlY2sgaXRzIG93biB3b3JrLiBCcmVhZHRoIGlzIG5vdCBnZW5lcmFsIGludGVsbGlnZW5jZS4iLCJFdmVyeSBzeXN0ZW0gaW4gdXNlIHRvZGF5IGlzIG5hcnJvdyAodHJ1ZSkuIE1hbnkgdGFza3MgZG8gbm90IGVxdWFsIGdlbmVyYWwgaW50ZWxsaWdlbmNlIChmYWxzZSkuIFJlc2VhcmNoZXJzIGRpc2FncmVlIHNoYXJwbHkgYWJvdXQgd2hldGhlciBhbmQgd2hlbiBnZW5lcmFsIEFJIHdpbGwgYXJyaXZlIChmYWxzZSkuIl0sWyJMYXJnZSBsYW5ndWFnZSBtb2RlbHMgZ2VuZXJhdGUgdGV4dCBvbmUgcGllY2UgYXQgYSB0aW1lIChMKS4gQ29tcHV0ZXIgdmlzaW9uIHJlYWRzIHNjYW5zIGFuZCBpbnNwZWN0cyBwYXJ0cyAoVikuIEdlbkFJIGNyZWF0ZXMgbmV3IGNvbnRlbnQgc3VjaCBhcyBpbWFnZXMgKEcpLiIsIkF1dG9ub21vdXMgc3lzdGVtcyBzZW5zZSwgZGVjaWRlLCBhbmQgYWN0IGluIHRoZSBwaHlzaWNhbCB3b3JsZCAoQSkuIFJlaW5mb3JjZW1lbnQgbGVhcm5pbmcgdHJhaW5zIHRocm91Z2ggcmV3YXJkcyAoUikuIE5hdHVyYWwgbGFuZ3VhZ2UgcHJvY2Vzc2luZyBoYW5kbGVzIHRvbmUsIGNvbnRleHQsIGFuZCBtZWFuaW5nIChOKS4iLCJGYXN0ZXIgaGFyZHdhcmUsIGJldHRlciBhbGdvcml0aG1zLCBhbmQgZmFyIG1vcmUgZGF0YSBkcm92ZSB0aGUgbGFzdCBkZWNhZGUgKEIpLiIsIkV2ZXJ5IG9uZSBvZiB0aGVzZSB0b29scyBoYXMgbGltaXRzLiBLbm93aW5nIHRoZSBsaW1pdHMgbWF0dGVycyBhcyBtdWNoIGFzIGtub3dpbmcgd2hhdCB0aGUgdG9vbHMgY2FuIGRvLiJdXQ=='));
+function $(s){return document.querySelector(s);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function hsh(s){var x=5381;for(var i=0;i<s.length;i++)x=((x<<5)+x+s.charCodeAt(i))>>>0;return x.toString(36);}
+
+var Q3=[['P','What patterns does it recognize?'],['L','What did it learn from?'],['D','What decision does it make?']];
+var NEST=[['A','AI, but not machine learning'],['M','Machine learning'],['D','Deep learning']];
+var TERMS=[['1','Algorithm'],['2','Training data'],['3','Model']];
+var TF=[['T','True'],['F','False']];
+var LEARN=[['1','Symbolic (rule-based)'],['2','Supervised learning'],['3','Unsupervised learning'],['4','Reinforcement learning']];
+var DOES=[['N','Natural language processing'],['V','Computer vision'],['B','Robotics'],['C','Recommendation system']];
+var BUILT=[['K','Neural network'],['T','Decision tree'],['G','Genetic algorithm']];
+var YEARS=[['1','1950'],['2','1955 to 1956'],['3','1997'],['4','2012'],['5','2016'],['6','2017'],['7','2022']];
+var NG=[['N','Narrow AI. It exists today.'],['G','General AI. No such system exists.']];
+var TECH=[['L','Large language models'],['N','Natural language processing'],['V','Computer vision'],['R','Reinforcement learning'],['G','GenAI'],['A','Autonomous systems']];
+
+var ST=[
+ {name:'The Three Questions',tag:'You already use AI every day',sep:'',
+  intro:'Every AI system answers three questions. Each line below describes one part of a system you already use. Pick the question that line answers. Your six letters, in order, are the code.',
+  opts:Q3,
+  hint:'L is the raw material the system was fed. P is something the system found in that material. D is what the system does at the end.',
+  items:[
+   {t:'Navigation app, line 1',d:'Its raw material: speed reports from thousands of phones on the road.'},
+   {t:'Navigation app, line 2',d:'It compares the possible routes and sends you down the fastest one.'},
+   {t:'Navigation app, line 3',d:'It has noticed that you take the same road home most weekdays.'},
+   {t:'Bank fraud system',d:'It blocks the purchase and texts you.'},
+   {t:'Music app',d:'It has found that people who play this song also tend to play these five.'},
+   {t:'Spam filter',d:'Its raw material: thousands of emails already marked spam or not spam.'}]},
+ {name:'The Vocabulary Vault',tag:'Key terms',sep:'',
+  intro:'This lock wants eight characters. Three name the right label. Three name the working parts of a spam filter. Two judge a claim. Answer in order to build the code.',
+  hint:'The three labels nest. Deep learning sits inside machine learning, and machine learning sits inside AI. For the spam filter: the examples, the steps, and the result are three different things.',
+  items:[
+   {g:'Pick the narrowest label the description supports.',t:'Tax program',d:'It follows rules a person wrote for every case. It never learns from data.',opts:NEST},
+   {t:'Face unlock',d:'A neural network with many layers finds complex patterns in your face.',opts:NEST},
+   {t:'Music app',d:'It learns from your listening data and gets better at picking songs. Nothing says how it is built.',opts:NEST},
+   {g:'A spam filter has three working parts. Name each one.',t:'Part one',d:'Thousands of emails already marked spam or not spam.',opts:TERMS},
+   {t:'Part two',d:'The set of steps that works through those examples and finds the patterns.',opts:TERMS},
+   {t:'Part three',d:'The learned pattern that scores a new email when it arrives.',opts:TERMS},
+   {g:'True or false?',t:'Claim one',d:'Every deep learning system is machine learning.',opts:TF},
+   {t:'Claim two',d:'A system that follows hand-written rules is not AI.',opts:TF}]},
+ {name:'The Sorting Bay',tag:'Major categories of AI systems',sep:'',
+  intro:'You can sort any AI system three ways: by how it reasons, by what it does, and by how it is built. Sort these nine. Your nine characters, in order, are the code.',
+  hint:'For the first four, ask where the rule came from: a person, labeled examples, unlabeled data, or rewards. For the builds, one can be traced step by step and one borrows from natural selection.',
+  items:[
+   {g:'How does it reason or learn?',t:'Medical expert system',d:'A person wrote the rule: if the patient has a fever and a stiff neck, consider meningitis.',opts:LEARN},
+   {t:'Retail analytics',d:'It sorts customers into groups nobody defined in advance.',opts:LEARN},
+   {t:'Game player',d:'It plays millions of rounds. Good moves earn rewards. Bad moves earn penalties.',opts:LEARN},
+   {t:'Loan screener',d:'It trains on past loans. Each one is labeled repaid or defaulted.',opts:LEARN},
+   {g:'What does it work with?',t:'Flight-line inspection',d:'It finds damage in aircraft inspection photos.',opts:DOES},
+   {t:'Review monitor',d:'It reads customer reviews and reports whether the tone is positive or negative.',opts:DOES},
+   {t:'Streaming service',d:'It uses your past choices to suggest the next show.',opts:DOES},
+   {g:'How is it built?',t:'Build one',d:'It reaches an answer through a chain of yes-or-no questions. You can trace exactly how it decided.',opts:BUILT},
+   {t:'Build two',d:'It generates many possible solutions, keeps the best, and combines them, round after round.',opts:BUILT}]},
+ {name:'The Archive',tag:'A short history of AI',sep:'',
+  intro:'Six records lost their dates. Stamp each one with its year. Then answer two questions about the pattern behind the timeline. Your eight characters, in order, are the code.',
+  hint:'Order of events: the test, the name, the chess match, the image contest, the Go match, the transformer. For the last two questions, think about rules against data.',
+  items:[
+   {g:'Stamp each record with its year.',t:'Record A',d:'AlexNet, a neural network, wins an image recognition contest by a wide margin. Deep learning takes over.',opts:YEARS},
+   {t:'Record B',d:'A proposal for a summer workshop at Dartmouth coins the term "artificial intelligence".',opts:YEARS},
+   {t:'Record C',d:'IBM\'s Deep Blue defeats world chess champion Garry Kasparov.',opts:YEARS},
+   {t:'Record D',d:'Google researchers publish the transformer design, the foundation of today\'s large language models.',opts:YEARS},
+   {t:'Record E',d:'Alan Turing proposes a test: can a machine hold a conversation you cannot tell apart from a person\'s?',opts:YEARS},
+   {t:'Record F',d:'DeepMind\'s AlphaGo beats Go champion Lee Sedol in Seoul.',opts:YEARS},
+   {g:'Read the pattern.',t:'The second AI winter',d:'Why did the expert systems boom of the 1980s collapse?',long:true,opts:[
+     ['A','Chess programs beat them at their own tasks.'],['B','Governments banned rule-based software.'],
+     ['C','They cost too much to maintain, were hard to update, and could not learn.'],['D','GenAI chatbots replaced them.']]},
+   {t:'The big shift',d:'What changed between the AI winters and the current boom?',long:true,opts:[
+     ['A','AI stopped writing intelligence down as rules and started learning from data.'],['B','AI stopped using data and returned to hand-written rules.'],
+     ['C','Researchers gave up on neural networks.'],['D','Computers got slower, so programs got simpler.']]}]},
+ {name:'The Boundary Check',tag:'Narrow AI and general AI',sep:'',
+  intro:'Four systems are waiting at the checkpoint. Decide which side of the line each one belongs on. Then judge three claims. Your seven letters, in order, are the code.',
+  hint:'Ask where each system\'s ability stops. Handling many kinds of tasks is breadth. Breadth alone does not make a system general.',
+  items:[
+   {g:'Narrow or general?',t:'System one',d:'It reads chest X-rays with great skill. It cannot schedule your appointment.',opts:NG},
+   {t:'System two',d:'It could learn and apply knowledge in any field and take on any intellectual task a person can.',opts:NG},
+   {t:'System three',d:'It flags fraud on your bank card.',opts:NG},
+   {t:'System four',d:'A GenAI chatbot writes an email, explains a tax form, and debugs code. It also invents sources and cannot check its own work against the real world.',opts:NG},
+   {g:'True or false?',t:'Claim one',d:'Every AI system in use today is narrow AI.',opts:TF},
+   {t:'Claim two',d:'A system that handles many kinds of tasks has general intelligence.',opts:TF},
+   {t:'Claim three',d:'Researchers agree on when general AI will arrive.',opts:TF}]},
+ {name:'The Technology Deck',tag:'AI technologies today',sep:'',
+  intro:'This is the last door. Six cards describe six technologies in use today. Name each one, then answer the final check. Your seven letters, in order, are the code.',
+  hint:'Two cards are easy to swap. One describes the engine that generates text. The other describes creating new content such as images. Read for the word "text".',
+  items:[
+   {g:'Name the technology.',t:'Card 1',d:'They learn from huge amounts of text and generate new text one piece at a time. They are the engines behind chatbots.',opts:TECH},
+   {t:'Card 2',d:'It reads medical scans and inspects parts on assembly lines.',opts:TECH},
+   {t:'Card 3',d:'It creates new content instead of only analyzing it. Diffusion models produce realistic images from a text description.',opts:TECH},
+   {t:'Card 4',d:'It senses, decides, and acts in the physical world: delivery robots and uncrewed aircraft.',opts:TECH},
+   {t:'Card 5',d:'It trains systems through rewards. A version that uses human feedback makes chatbots more helpful and less harmful.',opts:TECH},
+   {t:'Card 6',d:'It has moved past keyword matching to handle tone, context, and meaning. It powers customer service bots and content moderation.',opts:TECH},
+   {g:'Final check.',t:'The last decade',d:'Which three things drove the fast progress of the past decade?',long:true,opts:[
+     ['A','Bigger screens, cheaper phones, and faster internet.'],['B','Faster hardware, better algorithms, and far more data.'],
+     ['C','More hand-written rules, larger expert teams, and more funding.'],['D','Fewer limits, less testing, and looser definitions.']]}]}
+];
+var N=ST.length;
+
+/* ---------- state ---------- */
+function fresh(){return {team:'',members:'',at:0,start:0,pen:0,stage:0,wrong:0,hints:0,hinted:[],codes:[],done:false,finish:0};}
+function load(){try{var s=JSON.parse(localStorage.getItem(KEY));if(s&&typeof s.stage==='number')return s;}catch(e){}return null;}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+var S=load()||fresh();
+var sels=ST.map(function(){return [];});
+var phase='intro';
+var sound=true, actx=null;
+
+function remaining(){if(!S.start)return LIMIT;if(S.done)return S.finish;return LIMIT-(Date.now()-S.start)/1000-S.pen*PEN;}
+function fmt(sec){var neg=sec<0;sec=Math.floor(Math.abs(sec));var m=Math.floor(sec/60),s=sec%60;return (neg?'+':'')+m+':'+(s<10?'0':'')+s;}
+function tick(){var r=remaining(),c=$('#clock');c.textContent=fmt(r);c.className='clock'+(r<0?' over':r<300?' low':'');}
+function pips(){var h='';for(var i=0;i<N;i++){var cls=i<S.stage?'ok':(i===S.stage&&S.start?'now':'');h+='<span class="pip '+cls+'" title="Door '+(i+1)+(i<S.stage?' cleared':' locked')+'">'+(i+1)+'</span>';}$('#pips').innerHTML=h;}
+function beep(f,d,t){if(!sound)return;try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();var o=actx.createOscillator(),g=actx.createGain();o.type=t||'square';o.frequency.value=f;g.gain.value=.04;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+d);o.stop(actx.currentTime+d);}catch(e){}}
+
+/* ---------- panels ---------- */
+var overlay=$('#overlay'), panel=$('#panel'), prompt=$('#prompt');
+function show(html,cls){panel.className='panel'+(cls?' '+cls:'');panel.innerHTML=html;overlay.hidden=false;prompt.hidden=true;overlay.scrollTop=0;}
+function hide(){overlay.hidden=true;}
+
+function showIntro(){
+  phase='intro';
+  show('<p class="eyebrow">Alert. Joint Facility failsafe lockdown.</p><h1>Operation Ground Truth</h1>'+
+   '<p>An experimental AI system at the Joint Facility has locked itself down. The contractors who installed it could not say what it is, what it learned from, or what it decides. The override accepts only operators who can.</p>'+
+   '<p>Six blast doors stand between your team and the exit. Each door has a terminal. Each terminal wants an override code.</p>'+
+   '<ol class="steps"><li>Walk to the locked door and open its terminal.</li><li>Solve the puzzle as a team. Your answers build the code.</li><li>Enter the code. A correct code opens the door.</li><li>Clear all six doors before the clock reaches 0:00.</li></ol>'+
+   '<p class="dim">Your team name and member names print on your certificate. You have 50:00. Every rejected code removes 1:00. Every hint removes 1:00. Your progress is saved on this device if the page reloads.</p>'+
+   '<div class="field"><label for="team">Team name</label><input id="team" type="text" maxlength="30" autocomplete="off" placeholder="Type your team name"></div>'+
+   '<div class="field"><label for="members">Team members</label><input id="members" type="text" maxlength="90" autocomplete="off" placeholder="First names, separated by commas"></div>'+
+   '<div class="row"><button class="go" id="begin" type="button">Start the clock</button><span class="dim">The clock starts when you press this button.</span></div>');
+}
+
+function codeOf(i){var st=ST[i];return st.items.map(function(_,k){return sels[i][k]||'_';}).join(st.sep);}
+
+function showTerminal(){
+  var i=S.stage, st=ST[i]; phase='terminal';
+  var h='<div class="head"><div><p class="eyebrow">Station '+(i+1)+' of '+N+'. '+st.tag+'</p><h2>'+st.name+'</h2></div><button class="ghost" id="back" type="button">Back to corridor</button></div>'+
+    '<p>'+st.intro+'</p>'+(st.ref||'');
+  h+='<ol class="items">';
+  st.items.forEach(function(it,k){
+    var opts=it.opts||st.opts;
+    if(it.g)h+='<li class="grp"><h3>'+it.g+'</h3></li>';
+    h+='<li class="'+(sels[i][k]?'set':'')+'" data-li="'+k+'"><h3>'+it.t+'</h3>'+(it.d?(it.d.charAt(0)==='<'?it.d:'<p>'+it.d+'</p>'):'')+
+      '<div class="chips'+((st.long||it.long)?' long':'')+'" role="radiogroup" aria-label="'+esc(it.t)+'">'+
+      opts.map(function(o){return '<button type="button" class="chip" role="radio" id="c-'+i+'-'+k+'-'+o[0]+'" data-k="'+k+'" data-v="'+o[0]+'" aria-checked="'+(sels[i][k]===o[0])+'"><b>'+o[0]+'</b>'+o[1]+'</button>';}).join('')+
+      '</div></li>';
+  });
+  h+='</ol><div class="codebar"><span class="code" id="code" aria-label="Current code">'+codeOf(i)+'</span>'+
+     '<button class="go" id="submit" type="button">'+(i===N-1?'Trigger manual release':'Enter code')+'</button>'+
+     '<button class="ghost" id="hint" type="button">'+(S.hinted[i]?'Show hint again':'Hint (costs 1:00)')+'</button></div>'+
+     '<p class="fb" id="fb" role="status">Pick one answer for every item. Then press '+(i===N-1?'Trigger manual release':'Enter code')+'.</p>';
+  show(h);
+}
+
+function submit(){
+  var i=S.stage, st=ST[i], n=st.items.length, missing=0, right=0, fb=$('#fb');
+  for(var k=0;k<n;k++){if(!sels[i][k])missing++;else if(hsh('gt|'+i+'|'+k+'|'+sels[i][k])===HASH[i][k])right++;}
+  if(missing){fb.className='fb bad';fb.textContent='The code is incomplete. '+missing+' item'+(missing>1?'s still need':' still needs')+' an answer. No time was removed.';return;}
+  if(right<n){
+    S.wrong++;S.pen++;save();tick();beep(140,.35,'sawtooth');
+    fb.className='fb bad';
+    fb.textContent='Code rejected. '+right+' of '+n+' answer'+(n>1?'s are':' is')+' correct. 1:00 was removed from the clock. Change your answers and enter the code again.';
+    panel.classList.remove('shake');void panel.offsetWidth;panel.classList.add('shake');return;
+  }
+  var left=remaining();
+  S.codes[i]=codeOf(i);S.stage=i+1;
+  if(S.stage===N){S.finish=left;S.done=true;S.at=Date.now();}
+  save();pips();tick();beep(660,.15);setTimeout(function(){beep(990,.25);},140);
+  showSolved(i);
+}
+
+function showSolved(i){
+  phase='solved';
+  var last=i===N-1;
+  show('<p class="eyebrow">Lock '+(i+1)+' of '+N+' released</p><h2>'+(last?'Manual release triggered':'Code accepted')+'</h2>'+
+   '<div class="row"><span class="code">'+esc(S.codes[i])+'</span></div>'+
+   '<h3>Why this code is right</h3><ul class="why">'+EXPL[i].map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>'+
+   '<div class="row"><button class="go green" id="proceed" type="button">'+(last?'Leave the facility':'Walk through the door')+'</button>'+
+   '<span class="dim">'+(last?'The clock has stopped.':'The clock is still running. Next stop: Station '+(i+2)+'.')+'</span></div>','ok');
+}
+
+function stamp(t){var d=new Date(t||Date.now());try{return d.toLocaleString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short'});}catch(e){return d.toString();}}
+function showWin(){
+  phase='win';G.setProgress(N);
+  var r=S.finish, over=r<0;
+  var id=hsh([S.team,S.members,S.at,S.codes.join(''),S.wrong,S.hints].join('|')).toUpperCase();
+  show('<div class="cert">'+
+   '<p class="eyebrow">System restored. Ground truth verified.</p>'+
+   '<h1>Certificate of Escape</h1>'+
+   '<p class="cert-line">This certifies that team</p>'+
+   '<p class="cert-team">'+esc(S.team)+'</p>'+
+   (S.members?'<p class="cert-members">'+esc(S.members)+'</p>':'')+
+   '<p class="cert-line">cleared all six doors of Operation Ground Truth'+(over?' in overtime.':' before the clock ran out.')+'</p>'+
+   '<dl class="stats"><div class="wide"><dt>Completed</dt><dd class="sm">'+esc(stamp(S.at))+'</dd></div>'+
+   '<div><dt>'+(over?'Overtime':'Time left')+'</dt><dd>'+fmt(Math.abs(r))+'</dd></div>'+
+   '<div><dt>Clock used</dt><dd>'+fmt(LIMIT-r)+'</dd></div>'+
+   '<div><dt>Rejected codes</dt><dd>'+S.wrong+'</dd></div><div><dt>Hints used</dt><dd>'+S.hints+'</dd></div></dl>'+
+   '<p class="cert-id">Certificate ID '+id+'</p></div>'+
+   '<div class="row noprint">'+(CANPRINT?'<button class="go green" id="print" type="button">Print certificate</button><p><strong>Next step:</strong> press Print certificate, or take a screen capture of this certificate. Then turn it in to your instructor.</p>':'<p><strong>Next step:</strong> take a screen capture of this certificate. Then turn it in to your instructor.</p>')+'</div>','ok');
+}
+
+function arrive(){
+  phase='door';hide();
+  var st=ST[S.stage];
+  $('#ptext').textContent='Station '+(S.stage+1)+' of '+N+': '+st.name+'. This door is locked.';
+  prompt.hidden=false;pips();
+}
+function proceed(){
+  hide();phase='walk';
+  G.openDoor(S.stage-1);
+  if(S.stage>=N)G.walkTo(G.endZ,showWin);else G.walkTo(G.stopZ(S.stage),arrive);
+}
+
+panel.addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.id==='begin'){
+    S=fresh();S.team=($('#team').value||'').trim()||'Unnamed team';S.members=($('#members').value||'').trim();S.start=Date.now();save();pips();tick();
+    beep(440,.12);hide();phase='walk';G.walkTo(G.stopZ(0),arrive);
+  }else if(b.classList.contains('chip')){
+    var i=S.stage,k=+b.dataset.k;sels[i][k]=b.dataset.v;
+    b.parentNode.querySelectorAll('.chip').forEach(function(c){c.setAttribute('aria-checked',c===b);});
+    b.closest('li').classList.add('set');$('#code').textContent=codeOf(i);beep(520,.04);
+  }else if(b.id==='submit'){submit();
+  }else if(b.id==='hint'){
+    var i2=S.stage,fb=$('#fb');
+    if(!S.hinted[i2]){S.hinted[i2]=true;S.hints++;S.pen++;save();tick();b.textContent='Show hint again';}
+    fb.className='fb tip';fb.textContent='Hint: '+ST[i2].hint;
+  }else if(b.id==='back'){arrive();
+  }else if(b.id==='proceed'){proceed();
+  }else if(b.id==='print'){window.print();}
+});
+$('#pbtn').addEventListener('click',function(){if(phase==='door')showTerminal();});
+$('#scene').addEventListener('click',function(){if(phase==='door')showTerminal();});
+$('#snd').addEventListener('click',function(){sound=!sound;this.textContent='Sound: '+(sound?'on':'off');});
+$('#rs').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.id==='restart'){this.innerHTML='<span class="confirm">Erase this team\'s progress? <button class="ghost" id="rs-yes" type="button">Yes, restart</button><button class="ghost" id="rs-no" type="button">No</button></span>';}
+  else{
+    if(b.id==='rs-yes'){try{localStorage.removeItem(KEY);}catch(x){}S=fresh();sels=ST.map(function(){return [];});G.setProgress(0);G.jump(G.startZ);pips();tick();showIntro();}
+    this.innerHTML='<button class="ghost" id="restart" type="button">Restart</button>';
+  }
+});
+
+/* ---------- 3D corridor (optional layer: the game still runs without it) ---------- */
+function init3D(){
+  var T=window.THREE, cv=$('#scene');if(!T)return null;
+  var r;try{r=new T.WebGLRenderer({canvas:cv,antialias:true});}catch(e){return null;}
+  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var W=6,H=4.2,GAP=14,C={void:0x0a121c,amber:0xffb23e,lock:0xff6152,clear:0x62e6b4};
+  function doorZ(i){return -(i+1)*GAP;}
+  var startZ=3, endZ=doorZ(N-1)-5.5, LEN=112, MID=6-LEN/2;
+  var scene=new T.Scene();scene.background=new T.Color(C.void);scene.fog=new T.Fog(C.void,7,40);
+  var cam=new T.PerspectiveCamera(62,1,.1,120);cam.rotation.order='YXZ';cam.position.set(0,1.65,startZ);scene.add(cam);
+  scene.add(new T.AmbientLight(0x5a7392,.85));
+  var head=new T.PointLight(0xcfe0ff,.75,20);cam.add(head);
+
+  function tex(w,h,draw){var c=document.createElement('canvas');c.width=w;c.height=h;var t=new T.CanvasTexture(c);t.userData={draw:function(){draw(c.getContext('2d'),w,h);t.needsUpdate=true;}};t.userData.draw();return t;}
+  var floorT=tex(256,256,function(g,w,h){g.fillStyle='#1b2a3a';g.fillRect(0,0,w,h);g.strokeStyle='#0d1722';g.lineWidth=6;g.strokeRect(0,0,w,h);g.fillStyle='#24384d';g.fillRect(14,14,w-28,10);g.fillStyle='#31485f';[[24,40],[232,40],[24,232],[232,232]].forEach(function(p){g.beginPath();g.arc(p[0],p[1],5,0,7);g.fill();});});
+  floorT.wrapS=floorT.wrapT=T.RepeatWrapping;floorT.repeat.set(3,LEN/2);
+  var wallT=tex(256,256,function(g,w,h){g.fillStyle='#22344a';g.fillRect(0,0,w,h);g.fillStyle='#182636';g.fillRect(0,0,w,70);g.fillStyle='#2e455e';g.fillRect(0,118,w,14);g.strokeStyle='#101b28';g.lineWidth=4;g.strokeRect(0,0,w,h);g.fillStyle='#3a5672';g.fillRect(20,160,60,6);g.fillRect(20,174,34,6);});
+  wallT.wrapS=T.RepeatWrapping;wallT.repeat.set(LEN/4,1);
+  var steel=new T.MeshStandardMaterial({color:0x33485f,roughness:.6,metalness:.5});
+  var dark=new T.MeshStandardMaterial({color:0x17232f,roughness:.8,metalness:.3});
+  function add(m){scene.add(m);return m;}
+  var fl=add(new T.Mesh(new T.PlaneGeometry(W,LEN),new T.MeshStandardMaterial({map:floorT,roughness:.7,metalness:.3})));fl.rotation.x=-Math.PI/2;fl.position.z=MID;
+  var ce=add(new T.Mesh(new T.PlaneGeometry(W,LEN),dark));ce.rotation.x=Math.PI/2;ce.position.set(0,H,MID);
+  var wm=new T.MeshStandardMaterial({map:wallT,roughness:.75,metalness:.25});
+  var wl=add(new T.Mesh(new T.PlaneGeometry(LEN,H),wm));wl.rotation.y=Math.PI/2;wl.position.set(-W/2,H/2,MID);
+  var wr=add(new T.Mesh(new T.PlaneGeometry(LEN,H),wm));wr.rotation.y=-Math.PI/2;wr.position.set(W/2,H/2,MID);
+  var back=add(new T.Mesh(new T.PlaneGeometry(W,H),dark));back.rotation.y=Math.PI;back.position.set(0,H/2,6);
+  var ribV=new T.BoxGeometry(.2,H,.3),ribH=new T.BoxGeometry(W,.2,.3);
+  for(var z=4.5;z>-LEN+8;z-=3.5){var a=add(new T.Mesh(ribV,steel));a.position.set(-W/2+.1,H/2,z);var b=add(new T.Mesh(ribV,steel));b.position.set(W/2-.1,H/2,z);var c=add(new T.Mesh(ribH,steel));c.position.set(0,H-.1,z);}
+
+  /* ceiling light strips, one per corridor segment */
+  var strips=[];
+  for(var s=0;s<=N;s++){var z0=s===0?5:doorZ(s-1)-.6,z1=s===N?doorZ(N-1)-9:doorZ(s)+.6,m=new T.MeshBasicMaterial({color:0x8a6420});var sm=add(new T.Mesh(new T.BoxGeometry(.45,.06,z0-z1),m));sm.position.set(0,H-.24,(z0+z1)/2);strips.push(m);}
+
+  /* doors */
+  var doors=[],texs=[floorT,wallT];
+  var doorGeo=new T.BoxGeometry(1.6,3.2,.25),sideGeo=new T.BoxGeometry(1.4,H,.5),linGeo=new T.BoxGeometry(3.2,1,.5),stripGeo=new T.BoxGeometry(.12,3.2,.1);
+  ST.forEach(function(st,i){
+    var z=doorZ(i),d={o:0,t:0,open:false};
+    var dt=tex(1024,1024,function(g,w,h){
+      var gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#3b536d');gr.addColorStop(1,'#243649');g.fillStyle=gr;g.fillRect(0,0,w,h);
+      g.strokeStyle='#162330';g.lineWidth=18;g.strokeRect(30,30,w-60,h-60);
+      g.save();g.beginPath();g.rect(30,800,w-60,90);g.clip();g.fillStyle='#ffb23e';g.fillRect(0,800,w,90);g.fillStyle='#141c26';for(var x=-100;x<w+100;x+=90){g.beginPath();g.moveTo(x,890);g.lineTo(x+45,890);g.lineTo(x+135,800);g.lineTo(x+90,800);g.fill();}g.restore();
+      g.fillStyle='rgba(255,178,62,.92)';g.textAlign='center';g.textBaseline='middle';g.font='700 430px "Chakra Petch",Verdana,sans-serif';g.fillText('0'+(i+1),w/2,410);
+      g.fillStyle='#c9d8e6';g.font='600 46px "Chakra Petch",Verdana,sans-serif';g.fillText('OVERRIDE CODE REQUIRED',w/2,715);
+      g.fillStyle='#0f1822';g.fillRect(w/2-5,0,10,h);
+    });
+    var tl=dt.clone(),tr=dt.clone();tl.repeat.set(.5,1);tr.repeat.set(.5,1);tr.offset.set(.5,0);tl.needsUpdate=tr.needsUpdate=true;
+    texs.push({userData:{draw:function(){dt.userData.draw();tl.needsUpdate=tr.needsUpdate=true;}}});
+    function pm(t){return [steel,steel,steel,steel,new T.MeshStandardMaterial({map:t,roughness:.55,metalness:.4}),steel];}
+    d.L=add(new T.Mesh(doorGeo,pm(tl)));d.L.position.set(-.8,1.6,z);
+    d.R=add(new T.Mesh(doorGeo,pm(tr)));d.R.position.set(.8,1.6,z);
+    [-2.3,2.3].forEach(function(x){var w=add(new T.Mesh(sideGeo,steel));w.position.set(x,H/2,z);});
+    var lin=add(new T.Mesh(linGeo,steel));lin.position.set(0,3.7,z);
+    d.sm=new T.MeshBasicMaterial({color:C.lock});
+    [-1.72,1.72].forEach(function(x){var q=add(new T.Mesh(stripGeo,d.sm));q.position.set(x,1.6,z+.28);});
+    d.sign=tex(1024,240,function(g,w,h){
+      g.fillStyle='#0a121c';g.fillRect(0,0,w,h);var col=d.open?'#62e6b4':'#ff6152';g.strokeStyle=col;g.lineWidth=8;g.strokeRect(4,4,w-8,h-8);
+      g.textBaseline='middle';g.textAlign='left';g.fillStyle='#e1ebf4';g.font='600 58px "Chakra Petch",Verdana,sans-serif';g.fillText(st.name.toUpperCase(),40,82,w-80);
+      g.fillStyle=col;g.font='700 64px "Chakra Petch",Verdana,sans-serif';g.fillText(d.open?'CLEARED':'LOCKED',40,170);
+      g.textAlign='right';g.fillStyle='#93a9bd';g.font='500 48px "IBM Plex Mono",monospace';g.fillText('STATION '+(i+1)+'/'+N,w-40,170);
+    });
+    texs.push(d.sign);
+    var sg=add(new T.Mesh(new T.PlaneGeometry(3,.7),new T.MeshBasicMaterial({map:d.sign})));sg.position.set(0,3.7,z+.26);
+    var ped=add(new T.Mesh(new T.BoxGeometry(.5,1.1,.4),dark));ped.position.set(2.15,.55,z+1.3);
+    d.scr=new T.MeshBasicMaterial({color:C.amber});var sc=add(new T.Mesh(new T.BoxGeometry(.46,.34,.05),d.scr));sc.position.set(2.15,1.25,z+1.3);sc.rotation.x=-.55;
+    d.light=new T.PointLight(C.lock,1.3,13);d.light.position.set(0,2.9,z+2.6);scene.add(d.light);
+    doors.push(d);
+  });
+  var exit=add(new T.Mesh(new T.PlaneGeometry(W,H),new T.MeshBasicMaterial({color:0xe4fff4,fog:false})));exit.position.set(0,H/2,doorZ(N-1)-9.5);
+  var el=new T.PointLight(0xbfffe6,1.6,16);el.position.set(0,2.4,doorZ(N-1)-6);scene.add(el);
+
+  function setDoor(i,open,instant){var d=doors[i];if(!d)return;d.open=open;d.t=open?1:0;if(instant)d.o=d.t;var col=open?C.clear:C.lock;d.sm.color.setHex(col);d.light.color.setHex(col);d.scr.color.setHex(open?C.clear:C.amber);d.sign.userData.draw();strips[i].color.setHex(open?0x9ff5d2:0x8a6420);}
+  strips[N].color.setHex(0x9ff5d2);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){texs.forEach(function(t){t.userData.draw();});});
+
+  var targetZ=startZ,cb=null,bob=0,mx=0,my=0,lx=0,ly=0;
+  window.addEventListener('pointermove',function(e){mx=e.clientX/innerWidth*2-1;my=e.clientY/innerHeight*2-1;});
+  function size(){var w=innerWidth,h=innerHeight;r.setPixelRatio(Math.min(devicePixelRatio||1,2));r.setSize(w,h,false);cam.aspect=w/h;cam.fov=w<h?80:62;cam.updateProjectionMatrix();}
+  window.addEventListener('resize',size);size();
+  var last=performance.now();
+  function frame(now){
+    var dt=Math.min(.1,(now-last)/1000);last=now;
+    var dz=targetZ-cam.position.z,ad=Math.abs(dz);
+    if(ad>.02){var v=Math.min(6.5,Math.max(.9,ad*2.2));cam.position.z+=(dz<0?-1:1)*Math.min(ad,v*dt);bob+=dt;cam.position.y=1.65+(reduce?0:Math.sin(bob*9)*.035);}
+    else if(cb){cam.position.z=targetZ;var f=cb;cb=null;f();}
+    lx+=(mx-lx)*Math.min(1,dt*5);ly+=(my-ly)*Math.min(1,dt*5);cam.rotation.set(-ly*.1,-lx*.24,0);
+    for(var i=0;i<doors.length;i++){var d=doors[i];d.o+=(d.t-d.o)*Math.min(1,dt*3);d.L.position.x=-.8-1.5*d.o;d.R.position.x=.8+1.5*d.o;if(!d.open)d.scr.color.setHex(Math.sin(now/260)>0?C.amber:0xa8701e);}
+    r.render(scene,cam);requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  return {startZ:startZ,endZ:endZ,stopZ:function(i){return doorZ(i)+5.2;},
+    walkTo:function(z,f){if(reduce){cam.position.z=z;targetZ=z;setTimeout(f,250);}else{targetZ=z;cb=f;}},
+    jump:function(z){cam.position.z=z;targetZ=z;cb=null;},
+    openDoor:function(i){setDoor(i,true,false);},
+    setProgress:function(n){for(var i=0;i<N;i++)setDoor(i,i<n,true);}};
+}
+var G=init3D()||{startZ:0,endZ:0,stopZ:function(){return 0;},walkTo:function(z,f){setTimeout(f,300);},jump:function(){},openDoor:function(){},setProgress:function(){}};
+
+/* ---------- boot ---------- */
+pips();tick();setInterval(tick,250);
+if(S.done){G.setProgress(N);G.jump(G.endZ);showWin();}
+else if(S.start){G.setProgress(S.stage);G.jump(G.stopZ(S.stage));arrive();}
+else showIntro();
+})();
+</script>
+</body>
+</html>
